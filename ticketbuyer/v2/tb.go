@@ -6,6 +6,7 @@ package ticketbuyer
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
@@ -161,8 +162,8 @@ func (tb *TB) buy(ctx context.Context, passphrase []byte, tip *chainhash.Hash) e
 	votingAccount := tb.cfg.VotingAccount
 	maintain := tb.cfg.Maintain
 	votingAddr := tb.cfg.VotingAddr
-	poolFeeAddr := tb.cfg.PoolFeeAddr
-	poolFees := tb.cfg.PoolFees
+	// poolFeeAddr := tb.cfg.PoolFeeAddr
+	// poolFees := tb.cfg.PoolFees
 	tb.mu.Unlock()
 
 	// Determine how many tickets to buy
@@ -197,9 +198,11 @@ func (tb *TB) buy(ctx context.Context, passphrase []byte, tip *chainhash.Hash) e
 		}
 	}
 
-	feeRate := w.RelayFee()
-	tix, err := w.PurchaseTickets(maintain, -1, minconf, votingAddr, account,
-		buy, poolFeeAddr, poolFees, expiry, feeRate, feeRate)
+	// feeRate := w.RelayFee()
+	tix := []*chainhash.Hash(nil)
+	err = fmt.Errorf("disabled...")
+	// tix, err := w.PurchaseTickets(maintain, -1, minconf, votingAddr, account,
+	// 	buy, poolFeeAddr, poolFees, expiry, feeRate, feeRate)
 	for _, hash := range tix {
 		log.Infof("Purchased ticket %v at stake difficulty %v", hash, sdiff)
 	}

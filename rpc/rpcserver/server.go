@@ -580,14 +580,14 @@ func (s *walletServer) ImportScript(ctx context.Context,
 			"The script is not redeemable by the wallet")
 	}
 
-	lock := make(chan time.Time, 1)
-	defer func() {
-		lock <- time.Time{} // send matters, not the value
-	}()
-	err = s.wallet.Unlock(req.Passphrase, lock)
-	if err != nil {
-		return nil, translateError(err)
-	}
+	// lock := make(chan time.Time, 1)
+	// defer func() {
+	// 	lock <- time.Time{} // send matters, not the value
+	// }()
+	// err = s.wallet.Unlock(req.Passphrase, lock)
+	// if err != nil {
+	// 	return nil, translateError(err)
+	// }
 
 	if req.ScanFrom < 0 {
 		return nil, status.Errorf(codes.InvalidArgument,
@@ -1463,16 +1463,16 @@ func (s *walletServer) PurchaseTickets(ctx context.Context,
 			"Negative fees per KB given")
 	}
 
-	lock := make(chan time.Time, 1)
-	defer func() {
-		lock <- time.Time{} // send matters, not the value
-	}()
-	err = s.wallet.Unlock(req.Passphrase, lock)
-	if err != nil {
-		return nil, translateError(err)
-	}
+	// lock := make(chan time.Time, 1)
+	// defer func() {
+	// 	lock <- time.Time{} // send matters, not the value
+	// }()
+	// err = s.wallet.Unlock(req.Passphrase, lock)
+	// if err != nil {
+	// 	return nil, translateError(err)
+	// }
 
-	resp, err := s.wallet.PurchaseTickets(0, spendLimit, minConf,
+	splitBytes, ticketsBytes, err := s.wallet.PurchaseTickets(0, spendLimit, minConf,
 		ticketAddr, req.Account, numTickets, poolAddr, req.PoolFees,
 		expiry, txFee, ticketFee)
 	if err != nil {
@@ -1480,9 +1480,12 @@ func (s *walletServer) PurchaseTickets(ctx context.Context,
 			"Unable to purchase tickets: %v", err)
 	}
 
-	hashes := marshalHashes(resp)
+	// hashes := marshalHashes(resp)
 
-	return &pb.PurchaseTicketsResponse{TicketHashes: hashes}, nil
+	return &pb.PurchaseTicketsResponse{
+		SplitBytes:   splitBytes,
+		TicketsBytes: ticketsBytes,
+	}, nil
 }
 
 func (s *walletServer) RevokeTickets(ctx context.Context, req *pb.RevokeTicketsRequest) (*pb.RevokeTicketsResponse, error) {

@@ -543,6 +543,8 @@ message PurchaseTicketsRequest {
 }
 message PurchaseTicketsResponse {
 	repeated bytes ticket_hashes = 1;
+	bytes split_bytes = 2;
+	repeated bytes tickets_bytes = 3;
 }
 
 message RevokeTicketsRequest {

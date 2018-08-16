@@ -5,6 +5,7 @@
 package ticketbuyer
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrutil"
 	dcrrpcclient "github.com/decred/dcrd/rpcclient"
 	"github.com/decred/dcrwallet/errors"
@@ -143,8 +145,8 @@ func (t *TicketPurchaser) Config() (*Config, error) {
 		PoolAddress:               t.cfg.PoolAddress,
 		PoolFees:                  t.poolFees,
 		NoSpreadTicketPurchases:   t.cfg.NoSpreadTicketPurchases,
-		TxFee:                     t.cfg.TxFee,
-		VotingAddress:             t.cfg.VotingAddress,
+		TxFee:         t.cfg.TxFee,
+		VotingAddress: t.cfg.VotingAddress,
 	}
 	return config, nil
 }
@@ -826,25 +828,27 @@ func (t *TicketPurchaser) Purchase(height int64) (*PurchaseStats, error) {
 	}
 
 	// Purchase tickets.
-	poolFeesAmt, err := dcrutil.NewAmount(t.cfg.PoolFees)
-	if err != nil {
-		return ps, err
-	}
+	// poolFeesAmt, err := dcrutil.NewAmount(t.cfg.PoolFees)
+	// if err != nil {
+	// 	return ps, err
+	// }
 
 	// Ticket purchase requires 2 blocks to confirm
-	expiry := int32(int(height) + t.ExpiryDelta() + 2)
-	hashes, purchaseErr := t.wallet.PurchaseTickets(0,
-		maxPriceAmt,
-		0, // 0 minconf is used so tickets can be bought from split outputs
-		votingAddress,
-		account,
-		toBuyForBlock,
-		t.PoolAddress(),
-		poolFeesAmt.ToCoin(),
-		expiry,
-		t.wallet.RelayFee(),
-		t.wallet.TicketFeeIncrement(),
-	)
+	// expiry := int32(int(height) + t.ExpiryDelta() + 2)
+	hashes := []*chainhash.Hash(nil)
+	purchaseErr := fmt.Errorf("disabled....")
+	// hashes, purchaseErr := t.wallet.PurchaseTickets(0,
+	// 	maxPriceAmt,
+	// 	0, // 0 minconf is used so tickets can be bought from split outputs
+	// 	votingAddress,
+	// 	account,
+	// 	toBuyForBlock,
+	// 	t.PoolAddress(),
+	// 	poolFeesAmt.ToCoin(),
+	// 	expiry,
+	// 	t.wallet.RelayFee(),
+	// 	t.wallet.TicketFeeIncrement(),
+	// )
 	for i := range hashes {
 		log.Infof("Purchased ticket %v at stake difficulty %v (%v "+
 			"fees per KB used)", hashes[i], nextStakeDiff.ToCoin(),

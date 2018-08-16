@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -2062,10 +2063,10 @@ func lockUnspent(s *Server, icmd interface{}) (interface{}, error) {
 func purchaseTicket(s *Server, icmd interface{}) (interface{}, error) {
 	// Enforce valid and positive spend limit.
 	cmd := icmd.(*dcrjson.PurchaseTicketCmd)
-	w, ok := s.walletLoader.LoadedWallet()
-	if !ok {
-		return nil, errUnloadedWallet
-	}
+	// w, ok := s.walletLoader.LoadedWallet()
+	// if !ok {
+	// 	return nil, errUnloadedWallet
+	// }
 
 	spendLimit, err := dcrutil.NewAmount(cmd.SpendLimit)
 	if err != nil {
@@ -2075,85 +2076,87 @@ func purchaseTicket(s *Server, icmd interface{}) (interface{}, error) {
 		return nil, rpcErrorf(dcrjson.ErrRPCInvalidParameter, "negative spend limit")
 	}
 
-	account, err := w.AccountNumber(cmd.FromAccount)
-	if err != nil {
-		if errors.Is(errors.NotExist, err) {
-			return nil, errAccountNotFound
-		}
-		return nil, err
-	}
+	// account, err := w.AccountNumber(cmd.FromAccount)
+	// if err != nil {
+	// 	if errors.Is(errors.NotExist, err) {
+	// 		return nil, errAccountNotFound
+	// 	}
+	// 	return nil, err
+	// }
 
 	// Override the minimum number of required confirmations if specified
 	// and enforce it is positive.
-	minConf := int32(1)
-	if cmd.MinConf != nil {
-		minConf = int32(*cmd.MinConf)
-		if minConf < 0 {
-			return nil, rpcErrorf(dcrjson.ErrRPCInvalidParameter, "negative minconf")
-		}
-	}
+	// minConf := int32(1)
+	// if cmd.MinConf != nil {
+	// 	minConf = int32(*cmd.MinConf)
+	// 	if minConf < 0 {
+	// 		return nil, rpcErrorf(dcrjson.ErrRPCInvalidParameter, "negative minconf")
+	// 	}
+	// }
 
 	// Set ticket address if specified.
-	var ticketAddr dcrutil.Address
-	if cmd.TicketAddress != nil {
-		if *cmd.TicketAddress != "" {
-			addr, err := decodeAddress(*cmd.TicketAddress, w.ChainParams())
-			if err != nil {
-				return nil, err
-			}
-			ticketAddr = addr
-		}
-	}
+	// var ticketAddr dcrutil.Address
+	// if cmd.TicketAddress != nil {
+	// 	if *cmd.TicketAddress != "" {
+	// 		addr, err := decodeAddress(*cmd.TicketAddress, w.ChainParams())
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		ticketAddr = addr
+	// 	}
+	// }
 
-	numTickets := 1
-	if cmd.NumTickets != nil {
-		if *cmd.NumTickets > 1 {
-			numTickets = *cmd.NumTickets
-		}
-	}
+	// numTickets := 1
+	// if cmd.NumTickets != nil {
+	// 	if *cmd.NumTickets > 1 {
+	// 		numTickets = *cmd.NumTickets
+	// 	}
+	// }
 
 	// Set pool address if specified.
-	var poolAddr dcrutil.Address
-	var poolFee float64
-	if cmd.PoolAddress != nil {
-		if *cmd.PoolAddress != "" {
-			addr, err := decodeAddress(*cmd.PoolAddress, w.ChainParams())
-			if err != nil {
-				return nil, err
-			}
-			poolAddr = addr
+	// var poolAddr dcrutil.Address
+	// var poolFee float64
+	// if cmd.PoolAddress != nil {
+	// 	if *cmd.PoolAddress != "" {
+	// 		addr, err := decodeAddress(*cmd.PoolAddress, w.ChainParams())
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		poolAddr = addr
 
-			// Attempt to get the amount to send to
-			// the pool after.
-			if cmd.PoolFees == nil {
-				return nil, rpcErrorf(dcrjson.ErrRPCInvalidParameter, "pool address set without pool fee")
-			}
-			poolFee = *cmd.PoolFees
-			if !txrules.ValidPoolFeeRate(poolFee) {
-				return nil, rpcErrorf(dcrjson.ErrRPCInvalidParameter, "pool fee percentage %v", poolFee)
-			}
-		}
-	}
+	// 		// Attempt to get the amount to send to
+	// 		// the pool after.
+	// 		if cmd.PoolFees == nil {
+	// 			return nil, rpcErrorf(dcrjson.ErrRPCInvalidParameter, "pool address set without pool fee")
+	// 		}
+	// 		poolFee = *cmd.PoolFees
+	// 		if !txrules.ValidPoolFeeRate(poolFee) {
+	// 			return nil, rpcErrorf(dcrjson.ErrRPCInvalidParameter, "pool fee percentage %v", poolFee)
+	// 		}
+	// 	}
+	// }
 
 	// Set the expiry if specified.
-	expiry := int32(0)
-	if cmd.Expiry != nil {
-		expiry = int32(*cmd.Expiry)
-	}
+	// expiry := int32(0)
+	// if cmd.Expiry != nil {
+	// 	expiry = int32(*cmd.Expiry)
+	// }
 
-	ticketFee := w.TicketFeeIncrement()
+	// ticketFee := w.TicketFeeIncrement()
 
 	// Set the ticket fee if specified.
-	if cmd.TicketFee != nil {
-		ticketFee, err = dcrutil.NewAmount(*cmd.TicketFee)
-		if err != nil {
-			return nil, rpcError(dcrjson.ErrRPCInvalidParameter, err)
-		}
-	}
+	// if cmd.TicketFee != nil {
+	// 	ticketFee, err = dcrutil.NewAmount(*cmd.TicketFee)
+	// 	if err != nil {
+	// 		return nil, rpcError(dcrjson.ErrRPCInvalidParameter, err)
+	// 	}
+	// }
 
-	hashes, err := w.PurchaseTickets(0, spendLimit, minConf, ticketAddr,
-		account, numTickets, poolAddr, poolFee, expiry, w.RelayFee(),
-		ticketFee)
+	hashes := []*chainhash.Hash(nil)
+	err = fmt.Errorf("disabled...")
+	// hashes, err := w.PurchaseTickets(0, spendLimit, minConf, ticketAddr,
+	// 	account, numTickets, poolAddr, poolFee, expiry, w.RelayFee(),
+	// 	ticketFee)
 	if err != nil {
 		return nil, err
 	}

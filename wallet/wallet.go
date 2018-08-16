@@ -1114,7 +1114,8 @@ type (
 		err          error
 	}
 	purchaseTicketResponse struct {
-		data []*chainhash.Hash
+		splitBytes []byte
+		ticketsBytes [][]byte
 		err  error
 	}
 )
@@ -1168,14 +1169,14 @@ out:
 			txr.resp <- createMultisigTxResponse{tx, address, redeemScript, err}
 
 		case txr := <-w.purchaseTicketRequests:
-			heldUnlock, err := w.holdUnlock()
-			if err != nil {
-				txr.resp <- purchaseTicketResponse{nil, err}
-				continue
-			}
-			data, err := w.purchaseTickets("wallet.PurchaseTickets", txr)
-			heldUnlock.release()
-			txr.resp <- purchaseTicketResponse{data, err}
+			// heldUnlock, err := w.holdUnlock()
+			// if err != nil {
+			// 	txr.resp <- purchaseTicketResponse{nil, err}
+			// 	continue
+			// }
+			splitBytes, ticketsBytes, err := w.purchaseTickets("wallet.PurchaseTickets", txr)
+			// heldUnlock.release()
+			txr.resp <- purchaseTicketResponse{splitBytes, ticketsBytes, err}
 
 		case <-quit:
 			break out
@@ -1220,7 +1221,7 @@ func (w *Wallet) CreateMultisigTx(account uint32, amount dcrutil.Amount, pubkeys
 // to purchase a new ticket. It returns a slice of the hashes of the purchased
 // tickets.
 func (w *Wallet) PurchaseTickets(minBalance, spendLimit dcrutil.Amount, minConf int32, ticketAddr dcrutil.Address, account uint32, numTickets int, poolAddress dcrutil.Address,
-	poolFees float64, expiry int32, txFee dcrutil.Amount, ticketFee dcrutil.Amount) ([]*chainhash.Hash, error) {
+	poolFees float64, expiry int32, txFee dcrutil.Amount, ticketFee dcrutil.Amount) ([]byte, [][]byte, error) {
 
 	req := purchaseTicketRequest{
 		minBalance:  minBalance,
@@ -1238,7 +1239,7 @@ func (w *Wallet) PurchaseTickets(minBalance, spendLimit dcrutil.Amount, minConf 
 	}
 	w.purchaseTicketRequests <- req
 	resp := <-req.resp
-	return resp.data, resp.err
+	return resp.splitBytes, resp.ticketsBytes, resp.err
 }
 
 type (
