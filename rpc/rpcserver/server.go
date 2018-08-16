@@ -1696,7 +1696,7 @@ func (s *walletServer) ValidateAddress(ctx context.Context, req *pb.ValidateAddr
 		if err != nil {
 			return nil, err
 		}
-		result.PubKeyAddr = pubKeyAddr.EncodeAddress()
+		result.PubKeyAddr = pubKeyAddr.String()
 		result.IsInternal = ma.Internal()
 		result.Index = ma.Index()
 
