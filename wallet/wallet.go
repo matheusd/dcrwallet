@@ -6,6 +6,7 @@
 package wallet
 
 import (
+	"math/big"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -662,6 +663,58 @@ func (w *Wallet) LoadActiveDataFilters(ctx context.Context, n NetworkBackend, re
 	return nil
 }
 
+type sortedAmounts []dcrutil.Amount
+func (a sortedAmounts) Len() int           { return len(a) }
+func (a sortedAmounts) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a sortedAmounts) Less(i, j int) bool { return a[i] < a[j] }
+
+func politeiaVoterIndex(randomHash *chainhash.Hash, amounts []dcrutil.Amount) (int, error) {
+
+	if len(amounts) == 0 {
+		return 0, errors.E("not enough amounts")
+	}
+
+	if len(amounts) <= 2 {
+		var bestAmount dcrutil.Amount
+		var bestIndex int
+		for i, amt := range amounts {
+			if amt > bestAmount {
+				bestAmount = amt
+				bestIndex = i
+			}
+		}
+		return bestIndex, nil
+	}
+
+	sort.Sort(sortedAmounts(amounts))
+
+	// ignore the first one (smallest amount/pool fee)
+	var amountsSum dcrutil.Amount
+	for _, a := range amounts[1:] {
+		amountsSum += a
+	}
+
+	coinBig := big.NewInt(0)
+	n := big.NewInt(0)
+	n.SetBytes(randomHash[:])
+	m := big.NewInt(int64(amountsSum))
+	coinBig.Mod(n, m)
+
+	coin := coinBig.Uint64()
+
+	amountsSum = 0
+	var bestIndex int
+	for i, c := range amounts {
+		amountsSum += c
+		if coin < uint64(amountsSum) {
+			bestIndex = i
+			break
+		}
+	}
+
+	return bestIndex, nil
+}
+
 // CommittedTickets takes a list of tickets and returns a filtered list of
 // tickets that are controlled by this wallet.
 func (w *Wallet) CommittedTickets(tickets []*chainhash.Hash) ([]*chainhash.Hash, []dcrutil.Address, error) {
@@ -683,10 +736,12 @@ func (w *Wallet) CommittedTickets(tickets []*chainhash.Hash) ([]*chainhash.Hash,
 				continue
 			}
 
+			amounts := make([]dcrutil.Amount, 0, (len(tx.TxOut) -1) / 2 )
+			commitAddresses := make([]dcrutil.Address, 0, (len(tx.TxOut) -1) / 2 )
+
 			// Commitment outputs are at alternating output
 			// indexes, starting at 1.
 			var bestAddr dcrutil.Address
-			var bestAmount dcrutil.Amount
 
 			for i := 1; i < len(tx.TxOut); i += 2 {
 				scr := tx.TxOut[i].PkScript
@@ -707,16 +762,17 @@ func (w *Wallet) CommittedTickets(tickets []*chainhash.Hash) ([]*chainhash.Hash,
 					log.Debugf("%v", err)
 					break
 				}
-				if amt > bestAmount {
-					bestAddr = addr
-					bestAmount = amt
-				}
+				amounts = append(amounts, amt)
+				commitAddresses = append(commitAddresses, addr)
 			}
 
-			if bestAddr == nil {
-				log.Debugf("no best address")
+			idx, err := politeiaVoterIndex(v, amounts)
+			if err != nil {
+				log.Warn(err)
 				continue
 			}
+
+			bestAddr = commitAddresses[idx]
 
 			if !w.Manager.ExistsHash160(addrmgrNs,
 				bestAddr.Hash160()[:]) {
@@ -726,8 +782,7 @@ func (w *Wallet) CommittedTickets(tickets []*chainhash.Hash) ([]*chainhash.Hash,
 			}
 			ticketHash := tx.TxHash()
 			log.Tracef("Ticket purchase %v: best commitment"+
-				" address %v amount %v", &ticketHash, bestAddr,
-				bestAmount)
+				" address %v", &ticketHash, bestAddr)
 
 			hashes = append(hashes, v)
 			addresses = append(addresses, bestAddr)
