@@ -51,6 +51,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/v3"
 	"github.com/decred/dcrd/dcrec"
 	"github.com/decred/dcrd/dcrutil/v3"
+	"github.com/decred/dcrd/gcs/v2"
 	"github.com/decred/dcrd/hdkeychain/v3"
 	"github.com/decred/dcrd/txscript/v3"
 	"github.com/decred/dcrd/wire"
@@ -58,9 +59,9 @@ import (
 
 // Public API version constants
 const (
-	semverString = "7.4.0"
+	semverString = "7.5.0"
 	semverMajor  = 7
-	semverMinor  = 4
+	semverMinor  = 5
 	semverPatch  = 0
 )
 
@@ -196,6 +197,13 @@ type decodeMessageServer struct {
 	chainParams *chaincfg.Params
 }
 
+// networkServer provices RPC clients with the ability to perform network
+// related calls that are not necessarily used or backed by the wallet itself.
+type networkServer struct {
+	ready  uint32 // atomic
+	wallet *wallet.Wallet
+}
+
 // Singleton implementations of each service.  Not all services are immediately
 // usable.
 var (
@@ -209,6 +217,7 @@ var (
 	votingService              votingServer
 	messageVerificationService messageVerificationServer
 	decodeMessageService       decodeMessageServer
+	networkService             networkServer
 )
 
 // RegisterServices registers implementations of each gRPC service and registers
@@ -224,6 +233,7 @@ func RegisterServices(server *grpc.Server) {
 	pb.RegisterVotingServiceServer(server, &votingService)
 	pb.RegisterMessageVerificationServiceServer(server, &messageVerificationService)
 	pb.RegisterDecodeMessageServiceServer(server, &decodeMessageService)
+	pb.RegisterNetworkServiceServer(server, &networkService)
 }
 
 var serviceMap = map[string]interface{}{
@@ -237,6 +247,7 @@ var serviceMap = map[string]interface{}{
 	"walletrpc.VotingService":              &votingService,
 	"walletrpc.MessageVerificationService": &messageVerificationService,
 	"walletrpc.DecodeMessageService":       &decodeMessageService,
+	"walletrpc.NetworkService":             &networkService,
 }
 
 // ServiceReady returns nil when the service is ready and a gRPC error when not.
@@ -1926,6 +1937,59 @@ func (s *walletServer) Spender(ctx context.Context, req *pb.SpenderRequest) (*pb
 	return resp, nil
 }
 
+func (s *walletServer) GetCFilters(req *pb.GetCFiltersRequest, server pb.WalletService_GetCFiltersServer) error {
+	var startBlock, endBlock *wallet.BlockIdentifier
+	if req.StartingBlockHash != nil && req.StartingBlockHeight != 0 {
+		return status.Errorf(codes.InvalidArgument,
+			"starting block hash and height may not be specified simultaneously")
+	} else if req.StartingBlockHash != nil {
+		startBlockHash, err := chainhash.NewHash(req.StartingBlockHash)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "%s", err.Error())
+		}
+		startBlock = wallet.NewBlockIdentifierFromHash(startBlockHash)
+	} else if req.StartingBlockHeight != 0 {
+		startBlock = wallet.NewBlockIdentifierFromHeight(req.StartingBlockHeight)
+	}
+
+	if req.EndingBlockHash != nil && req.EndingBlockHeight != 0 {
+		return status.Errorf(codes.InvalidArgument,
+			"ending block hash and height may not be specified simultaneously")
+	} else if req.EndingBlockHash != nil {
+		endBlockHash, err := chainhash.NewHash(req.EndingBlockHash)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "%s", err.Error())
+		}
+		endBlock = wallet.NewBlockIdentifierFromHash(endBlockHash)
+	} else if req.EndingBlockHeight != 0 {
+		endBlock = wallet.NewBlockIdentifierFromHeight(req.EndingBlockHeight)
+	}
+
+	ctx := server.Context()
+
+	rangeFn := func(bh chainhash.Hash, key [gcs.KeySize]byte, cf *gcs.FilterV2) (bool, error) {
+		resp := &pb.GetCFiltersResponse{
+			Key:       key[:],
+			Filter:    cf.Bytes(),
+			BlockHash: bh[:],
+		}
+		server.Send(resp)
+
+		select {
+		case <-ctx.Done():
+			return true, ctx.Err()
+		default:
+			return false, nil
+		}
+	}
+	err := s.wallet.RangeCFiltersV2(ctx, startBlock, endBlock, rangeFn)
+	if err != nil {
+		return translateError(err)
+	}
+
+	return nil
+}
+
 func marshalTransactionInputs(v []wallet.TransactionSummaryInput) []*pb.TransactionDetails_Input {
 	inputs := make([]*pb.TransactionDetails_Input, len(v))
 	for i := range v {
@@ -3145,5 +3209,58 @@ func (s *walletServer) SignHashes(ctx context.Context, req *pb.SignHashesRequest
 	return &pb.SignHashesResponse{
 		PublicKey:  pubKey,
 		Signatures: signatures,
+	}, nil
+}
+
+// StartNetworkService starts the NetworkService.
+func StartNetworkService(server *grpc.Server, wallet *wallet.Wallet) {
+	networkService.wallet = wallet
+	if atomic.SwapUint32(&networkService.ready, 1) != 0 {
+		panic("service already started")
+	}
+}
+
+func (s *networkServer) checkReady() bool {
+	return atomic.LoadUint32(&s.ready) != 0
+}
+
+func (s *networkServer) GetRawBlock(ctx context.Context, req *pb.GetRawBlockRequest) (*pb.GetRawBlockResponse, error) {
+	n, err := s.wallet.NetworkBackend()
+	if err != nil {
+		return nil, translateError(err)
+	}
+
+	var bh *chainhash.Hash
+	if req.BlockHash == nil {
+		id := wallet.NewBlockIdentifierFromHeight(req.BlockHeight)
+		info, err := s.wallet.BlockInfo(ctx, id)
+		if err != nil {
+			return nil, translateError(err)
+		}
+
+		bh = &info.Hash
+	} else {
+		bh, err = chainhash.NewHash(req.BlockHash)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid blockhash: %s", err.Error())
+		}
+	}
+
+	blocks, err := n.Blocks(ctx, []*chainhash.Hash{bh})
+	if err != nil {
+		return nil, translateError(err)
+	}
+	if len(blocks) == 0 {
+		// Should never happen but protects against a possible panic on
+		// the following code.
+		return nil, status.Errorf(codes.Internal, "network returned 0 blocks")
+	}
+
+	rawBlock, err := blocks[0].Bytes()
+	if err != nil {
+		return nil, translateError(err)
+	}
+	return &pb.GetRawBlockResponse{
+		Block: rawBlock,
 	}, nil
 }
