@@ -85,7 +85,9 @@ type RemotePeer struct {
 	outPrio chan *msgAck
 	pongs   chan *wire.MsgPong
 
-	requestedBlocks     sync.Map // k=chainhash.Hash v=chan<- *wire.MsgBlock
+	requestedBlocks sync.Map   // k=chainhash.Hash v=chan<- *wire.MsgBlock
+	blocksMu        sync.Mutex // Controls access to Block() and Blocks()
+
 	requestedCFilters   sync.Map // k=chainhash.Hash v=chan<- *wire.MsgCFilter
 	requestedCFiltersV2 sync.Map // k=chainhash.Hash v=chan<- *wire.MsgCFilterV2
 	requestedTxs        map[chainhash.Hash]chan<- *wire.MsgTx
@@ -1048,6 +1050,17 @@ func (rp *RemotePeer) Addrs(ctx context.Context) error {
 func (rp *RemotePeer) Block(ctx context.Context, blockHash *chainhash.Hash) (*wire.MsgBlock, error) {
 	const opf = "remotepeer(%v).Block(%v)"
 
+	// Prevent concurrent access so we don't request duplicated data from
+	// the same peer. Given we may have been locked for a long time, check
+	// the ctx after aqcuiring the lock.
+	rp.blocksMu.Lock()
+	defer rp.blocksMu.Unlock()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	m := wire.NewMsgGetDataSizeHint(1)
 	err := m.AddInvVect(wire.NewInvVect(wire.InvTypeBlock, blockHash))
 	if err != nil {
@@ -1094,6 +1107,17 @@ func (rp *RemotePeer) Block(ctx context.Context, blockHash *chainhash.Hash) (*wi
 // peer.
 func (rp *RemotePeer) Blocks(ctx context.Context, blockHashes []*chainhash.Hash) ([]*wire.MsgBlock, error) {
 	const opf = "remotepeer(%v).Blocks"
+
+	// Prevent concurrent access so we don't request duplicated data from
+	// the same peer. Given we may have been locked for a long time, check
+	// the ctx after aqcuiring the lock.
+	rp.blocksMu.Lock()
+	defer rp.blocksMu.Unlock()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
 	m := wire.NewMsgGetDataSizeHint(uint(len(blockHashes)))
 	cs := make([]chan *wire.MsgBlock, len(blockHashes))
