@@ -135,10 +135,21 @@ func (s *Syncer) LoadTxFilter(ctx context.Context, reload bool, addrs []dcrutil.
 
 // PublishTransactions implements the PublishTransaction method of the
 // wallet.Peer interface.
-func (s *Syncer) PublishTransactions(ctx context.Context, txs ...*wire.MsgTx) error {
+func (s *Syncer) PublishTransactions(ctx context.Context, walletBacked bool, txs ...*wire.MsgTx) error {
 	msg := wire.NewMsgInvSizeHint(uint(len(txs)))
 	for _, tx := range txs {
 		txHash := tx.TxHash()
+		if !walletBacked {
+			// Load into the mempool and let the mempool handler
+			// know of it.
+			if _, loaded := s.mempool.LoadOrStore(txHash, tx); !loaded {
+				select {
+				case s.mempoolAdds <- &txHash:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		}
 		err := msg.AddInvVect(wire.NewInvVect(wire.InvTypeTx, &txHash))
 		if err != nil {
 			return errors.E(errors.Protocol, err)

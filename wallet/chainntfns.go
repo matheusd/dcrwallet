@@ -884,7 +884,7 @@ func (w *Wallet) VoteOnOwnedTickets(ctx context.Context, winningTicketHashes []*
 	w.recentlyPublishedMu.Unlock()
 
 	// Publish before recording votes in database to slightly reduce latency.
-	err = n.PublishTransactions(ctx, votes...)
+	err = n.PublishTransactions(ctx, true, votes...)
 	if err != nil {
 		log.Errorf("Failed to send one or more votes: %v", err)
 	}
@@ -1024,7 +1024,7 @@ func (w *Wallet) RevokeOwnedTickets(ctx context.Context, missedTicketHashes []*c
 	w.recentlyPublishedMu.Unlock()
 
 	// Publish before recording revocations in database.
-	err = n.PublishTransactions(ctx, revocations...)
+	err = n.PublishTransactions(ctx, true, revocations...)
 	if err != nil {
 		log.Errorf("Failed to send one or more revocations: %v", err)
 	}

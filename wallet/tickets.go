@@ -480,7 +480,7 @@ func (w *Wallet) RevokeExpiredTickets(ctx context.Context, p Peer) (err error) {
 	if err != nil {
 		return err
 	}
-	err = p.PublishTransactions(ctx, revocations...)
+	err = p.PublishTransactions(ctx, true, revocations...)
 	if err != nil {
 		return err
 	}

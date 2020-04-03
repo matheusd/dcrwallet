@@ -33,7 +33,7 @@ type Peer interface {
 	Blocks(ctx context.Context, blockHashes []*chainhash.Hash) ([]*wire.MsgBlock, error)
 	CFiltersV2(ctx context.Context, blockHashes []*chainhash.Hash) ([]FilterProof, error)
 	Headers(ctx context.Context, blockLocators []*chainhash.Hash, hashStop *chainhash.Hash) ([]*wire.BlockHeader, error)
-	PublishTransactions(ctx context.Context, txs ...*wire.MsgTx) error
+	PublishTransactions(ctx context.Context, walletBacked bool, txs ...*wire.MsgTx) error
 }
 
 // NetworkBackend provides wallets with Decred network functionality.  Some

@@ -198,7 +198,7 @@ func (r *RPC) PublishTransaction(ctx context.Context, tx *wire.MsgTx) error {
 // Transactions are sent in order and later transactions may spend outputs of
 // previous transactions.
 // No transaction may be an orphan.
-func (r *RPC) PublishTransactions(ctx context.Context, txs ...*wire.MsgTx) error {
+func (r *RPC) PublishTransactions(ctx context.Context, walletBacked bool, txs ...*wire.MsgTx) error {
 	const op errors.Op = "dcrd.PublishTransactions"
 
 	// sendrawtransaction does not allow orphans, so we can not concurrently

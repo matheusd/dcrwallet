@@ -4225,7 +4225,7 @@ func (w *Wallet) PublishTransaction(ctx context.Context, tx *wire.MsgTx, seriali
 		}
 	}
 
-	err = n.PublishTransactions(ctx, tx)
+	err = n.PublishTransactions(ctx, relevant, tx)
 	if err != nil {
 		if relevant {
 			if err := w.AbandonTransaction(ctx, &txHash); err != nil {
@@ -4255,7 +4255,7 @@ func (w *Wallet) PublishUnminedTransactions(ctx context.Context, p Peer) error {
 	if err != nil {
 		return errors.E(op, err)
 	}
-	err = p.PublishTransactions(ctx, unminedTxs...)
+	err = p.PublishTransactions(ctx, true, unminedTxs...)
 	if err != nil {
 		return errors.E(op, err)
 	}

@@ -443,7 +443,7 @@ func (w *Wallet) txToOutputs(ctx context.Context, op errors.Op, outputs []*wire.
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	err = n.PublishTransactions(ctx, atx.Tx)
+	err = n.PublishTransactions(ctx, true, atx.Tx)
 	if err != nil {
 		hash := atx.Tx.TxHash()
 		log.Errorf("Abandoning transaction %v which failed to publish", &hash)
@@ -612,7 +612,7 @@ func (w *Wallet) txToMultisigInternal(ctx context.Context, op errors.Op, dbtx wa
 		return txToMultisigError(errors.E(op, err))
 	}
 
-	err = n.PublishTransactions(ctx, msgtx)
+	err = n.PublishTransactions(ctx, true, msgtx)
 	if err != nil {
 		return txToMultisigError(errors.E(op, err))
 	}
@@ -775,7 +775,7 @@ func (w *Wallet) compressWalletInternal(ctx context.Context, op errors.Op, dbtx 
 		return nil, errors.E(op, err)
 	}
 
-	err = n.PublishTransactions(ctx, msgtx)
+	err = n.PublishTransactions(ctx, true, msgtx)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -1328,7 +1328,7 @@ func (w *Wallet) purchaseTickets(ctx context.Context, op errors.Op,
 		w.recentlyPublishedMu.Lock()
 		w.recentlyPublished[rec.Hash] = struct{}{}
 		w.recentlyPublishedMu.Unlock()
-		err = n.PublishTransactions(ctx, splitTx)
+		err = n.PublishTransactions(ctx, true, splitTx)
 		if err != nil {
 			return nil, err
 		}
@@ -1483,7 +1483,7 @@ func (w *Wallet) purchaseTickets(ctx context.Context, op errors.Op,
 
 		// TODO: Send all tickets, and all split transactions, together.  Purge
 		// transactions from DB if tickets cannot be sent.
-		err = n.PublishTransactions(ctx, ticket)
+		err = n.PublishTransactions(ctx, true, ticket)
 		if err != nil {
 			return purchaseTicketsResponse, errors.E(op, err)
 		}

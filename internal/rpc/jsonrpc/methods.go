@@ -3400,7 +3400,7 @@ func (s *Server) signRawTransactions(ctx context.Context, icmd interface{}) (int
 				}
 				sent := false
 				hashStr := ""
-				err = n.PublishTransactions(ctx, msgTx)
+				err = n.PublishTransactions(ctx, true, msgTx)
 				// If sendrawtransaction errors out (blockchain rule
 				// issue, etc), continue onto the next transaction.
 				if err == nil {

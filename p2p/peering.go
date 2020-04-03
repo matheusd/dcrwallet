@@ -1465,7 +1465,7 @@ func (rp *RemotePeer) Headers(ctx context.Context, blockLocators []*chainhash.Ha
 
 // PublishTransactions pushes an inventory message advertising transaction
 // hashes of txs.
-func (rp *RemotePeer) PublishTransactions(ctx context.Context, txs ...*wire.MsgTx) error {
+func (rp *RemotePeer) PublishTransactions(ctx context.Context, walletBacked bool, txs ...*wire.MsgTx) error {
 	const opf = "remotepeer(%v).PublishTransactions"
 	msg := wire.NewMsgInvSizeHint(uint(len(txs)))
 	for i := range txs {
