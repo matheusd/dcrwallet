@@ -39,4 +39,4 @@ require (
 	google.golang.org/grpc v1.25.1
 )
 
-replace go.etcd.io/bbolt => github.com/matheusd/bbolt v1.3.5-0.20200328154133-ef6e10561575
+replace go.etcd.io/bbolt => github.com/jrick/bbolt v1.3.4-0.20200402153132-d6be1a74f54c
